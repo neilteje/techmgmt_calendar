@@ -16,12 +16,38 @@ export default function CalendarView() {
 
   useEffect(() => {
     fetchEvents()
+    fetchHolidays()
   }, []) 
 
   const fetchEvents = async () => {
     const response = await fetch(`/api/events?sources=campus,athletics,gies,grainger,tm,holidays`)
     const data = await response.json()
     setEvents(data.events)
+  }
+
+  const fetchHolidays = async () => {
+    try {
+      const countryCode = "US" // Change this to any desired country
+      const year = currentDate.getFullYear()
+      const API_KEY = process.env.NEXT_PUBLIC_NINJA_API_KEY
+
+      const response = await fetch(`https://api.api-ninjas.com/v1/holidays?country=${countryCode}&year=${year}&type=`, {
+        headers: { "X-Api-Key": API_KEY as string}
+      })
+
+      const holidays = await response.json()
+      console.log("Holiday API Response:", holidays) 
+
+      const holidayEvents = holidays.map((holiday: any) => ({
+        id: holiday.date + "-" + holiday.name,
+        title: `${holiday.name}`,
+        date: holiday.date
+      }))
+
+      setEvents((prevEvents) => [...prevEvents, ...holidayEvents])
+    } catch (error) {
+      console.error("Failed to fetch holidays:", error)
+    }
   }
 
   const navigateMonth = (direction: "prev" | "next") => {
@@ -62,7 +88,7 @@ export default function CalendarView() {
         <div key={day} className="aspect-square border p-2 text-center">
           <div className="font-semibold">{day}</div>
           {dayEvents.map((event) => (
-            <div key={event.id} className="text-xs truncate">
+            <div key={event.id} className="text-xs">
               {event.title}
             </div>
           ))}
