@@ -91,29 +91,74 @@ export default function CalendarView() {
   }
 
   const fetchHolidays = async () => {
-    try {
-      const countryCode = "US"
-      const year = currentDate.getFullYear()
-      const API_KEY = process.env.NEXT_PUBLIC_NINJA_API_KEY
+  try {
+    const countryCodes = [
+      "US", // United States
+      "GB", // United Kingdom
+      "IN", // India
+      "IL", // Israel
+      "SA", // Saudi Arabia
+      "ID", // Indonesia
+      "MY", // Malaysia
+      "AE", // United Arab Emirates
+      "TR", // Turkey
+      "PK", // Pakistan
+      "RU"  // Russia
+    ]
+    
+    const religiousTypes = [
+      'christian',
+      'muslim',
+      'jewish_holiday',
+      'hindu_holiday',
+      'national_holiday_christian',
+      'national_holiday_orthodox',
+      'restricted_holiday'
+    ]
+    const year = currentDate.getFullYear()
+    const API_KEY = process.env.NEXT_PUBLIC_NINJA_API_KEY
+    
 
-      const response = await fetch(`https://api.api-ninjas.com/v1/holidays?country=${countryCode}&year=${year}&type=`, {
+    // Fetch holidays for all countries in parallel
+    const holidayPromises = countryCodes.map(countryCode =>
+      fetch(`https://api.api-ninjas.com/v1/holidays?country=${countryCode}&year=${year}&type=`, {
         headers: { "X-Api-Key": API_KEY as string }
-      })
+      }).then(response => response.json())
+    )
 
-      const holidays = await response.json()
-      const holidayEvents = holidays.map((holiday: any) => ({
+    const allCountriesHolidays = await Promise.all(holidayPromises)
+
+    // Merge and filter holidays from all countries
+    const holidayEvents = allCountriesHolidays
+      .flat() // Flatten the array of arrays
+      .filter((holiday: any) => 
+        // Remove duplicates by checking if we've seen this holiday name on this date
+        religiousTypes.some(type => 
+          holiday.type?.toLowerCase().includes(type)
+        )
+      )
+      // Remove duplicate holidays (same name on same date)
+      .reduce((unique: any[], holiday: any) => {
+        const key = `${holiday.date}-${holiday.name.toLowerCase()}`
+        if (!unique.find(h => `${h.date}-${h.name.toLowerCase()}` === key)) {
+          unique.push(holiday)
+        }
+        return unique
+      }, [])
+      .map((holiday: any) => ({
         id: holiday.date + "-" + holiday.name,
         title: `${holiday.name}`,
         date: holiday.date,
         type: holiday.type,
-        category: "Holidays in United States"
+        category: `Religious Holiday (${holiday.country})`, // Include country in category
+        description: `A ${holiday.type} holiday celebrated in ${holiday.country}` // Add description
       }))
 
-      setEvents((prevEvents) => [...prevEvents, ...holidayEvents])
-    } catch (error) {
-      console.error("Failed to fetch holidays:", error)
-    }
+    setEvents((prevEvents) => [...prevEvents, ...holidayEvents])
+  } catch (error) {
+    console.error("Failed to fetch holidays:", error)
   }
+}
 
   const navigateMonth = (direction: "prev" | "next") => {
     setCurrentDate((prevDate) => {
